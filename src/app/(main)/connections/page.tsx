@@ -7,13 +7,13 @@ import { revalidatePath } from 'next/cache'
 
 export default async function ConnectionsPage() {
   const supabase = await createClient()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) redirect('/')
 
-  // Fetch all connections with avatar included
   const { data: connections } = await supabase
     .from('connections')
     .select(`
@@ -36,13 +36,18 @@ export default async function ConnectionsPage() {
     `)
     .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
 
+  // Normalize profile (handles object or array)
+  const normalize = (profile: any) =>
+    Array.isArray(profile) ? profile[0] : profile
+
   const pendingRequests =
-    connections?.filter(
-      (c) => c.status === 'pending' && c.receiver.id === user.id
-    ) || []
+    connections?.filter((c: any) => {
+      const receiver = normalize(c.receiver)
+      return c.status === 'pending' && receiver?.id === user.id
+    }) || []
 
   const acceptedConnections =
-    connections?.filter((c) => c.status === 'accepted') || []
+    connections?.filter((c: any) => c.status === 'accepted') || []
 
   const updateConnectionStatus = async (
     id: string,
@@ -78,8 +83,8 @@ export default async function ConnectionsPage() {
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingRequests.map((req) => {
-              const sender = req.sender
+            {pendingRequests.map((req: any) => {
+              const sender = normalize(req.sender)
 
               return (
                 <div
@@ -87,9 +92,8 @@ export default async function ConnectionsPage() {
                   className="flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900/50 dark:bg-brand-950/20"
                 >
                   <div className="flex items-center gap-3">
-                    {/* Avatar */}
                     <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200">
-                      {sender.avatar_url ? (
+                      {sender?.avatar_url ? (
                         <img
                           src={sender.avatar_url}
                           alt={sender.full_name}
@@ -97,17 +101,17 @@ export default async function ConnectionsPage() {
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center font-semibold">
-                          {sender.full_name?.charAt(0)}
+                          {sender?.full_name?.charAt(0)}
                         </div>
                       )}
                     </div>
 
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-white">
-                        {sender.full_name}
+                        {sender?.full_name}
                       </h3>
                       <p className="text-xs text-slate-500">
-                        {sender.branch}
+                        {sender?.branch}
                       </p>
                     </div>
                   </div>
@@ -120,10 +124,7 @@ export default async function ConnectionsPage() {
                         'accepted'
                       )}
                     >
-                      <Button
-                        size="icon"
-                        className="h-8 w-8 rounded-full bg-brand-500 hover:bg-brand-600"
-                      >
+                      <Button size="icon" className="h-8 w-8 rounded-full bg-brand-500 hover:bg-brand-600">
                         <UserCheck className="h-4 w-4" />
                       </Button>
                     </form>
@@ -135,11 +136,7 @@ export default async function ConnectionsPage() {
                         'rejected'
                       )}
                     >
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-8 w-8 rounded-full text-slate-500 hover:text-red-500"
-                      >
+                      <Button size="icon" variant="outline" className="h-8 w-8 rounded-full text-slate-500 hover:text-red-500">
                         <UserX className="h-4 w-4" />
                       </Button>
                     </form>
@@ -159,11 +156,12 @@ export default async function ConnectionsPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {acceptedConnections.length > 0 ? (
-            acceptedConnections.map((conn) => {
+            acceptedConnections.map((conn: any) => {
+              const sender = normalize(conn.sender)
+              const receiver = normalize(conn.receiver)
+
               const friend =
-                conn.sender.id === user.id
-                  ? conn.receiver
-                  : conn.sender
+                sender?.id === user.id ? receiver : sender
 
               return (
                 <div
@@ -171,9 +169,8 @@ export default async function ConnectionsPage() {
                   className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 gap-4"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Avatar */}
                     <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-200">
-                      {friend.avatar_url ? (
+                      {friend?.avatar_url ? (
                         <img
                           src={friend.avatar_url}
                           alt={friend.full_name}
@@ -181,26 +178,23 @@ export default async function ConnectionsPage() {
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-lg font-bold">
-                          {friend.full_name?.charAt(0) || '?'}
+                          {friend?.full_name?.charAt(0) || '?'}
                         </div>
                       )}
                     </div>
 
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-white">
-                        {friend.full_name}
+                        {friend?.full_name}
                       </h3>
                       <p className="text-sm text-slate-500">
-                        {friend.branch} • Year {friend.year}
+                        {friend?.branch} • Year {friend?.year}
                       </p>
                     </div>
                   </div>
 
                   <Link href={`/chat/${conn.id}`} className="w-full sm:w-auto">
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:bg-brand-50 border-brand-200 dark:border-brand-900 dark:hover:bg-brand-950"
-                    >
+                    <Button variant="outline" className="w-full gap-2">
                       <MessageSquare className="h-4 w-4" /> Message
                     </Button>
                   </Link>
@@ -211,7 +205,6 @@ export default async function ConnectionsPage() {
             <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-800">
               <p className="text-slate-500 dark:text-slate-400">
                 You haven&apos;t added anyone to your circle yet.
-                
               </p>
             </div>
           )}
