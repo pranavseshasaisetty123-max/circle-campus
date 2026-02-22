@@ -5,6 +5,21 @@ import { Button } from '@/components/ui/button'
 import { MessageSquare, UserCheck, UserX } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 
+type Profile = {
+  id: string
+  full_name: string
+  branch: string
+  year: string
+  avatar_url: string | null
+}
+
+type Connection = {
+  id: string
+  status: 'pending' | 'accepted' | 'rejected'
+  sender: Profile | Profile[]
+  receiver: Profile | Profile[]
+}
+
 export default async function ConnectionsPage() {
   const supabase = await createClient()
 
@@ -14,7 +29,7 @@ export default async function ConnectionsPage() {
 
   if (!user) redirect('/')
 
-  const { data: connections } = await supabase
+  const { data } = await supabase
     .from('connections')
     .select(`
       id,
@@ -36,18 +51,19 @@ export default async function ConnectionsPage() {
     `)
     .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
 
-  // Normalize profile (handles object or array)
-  const normalize = (profile: any) =>
+  const connections = (data ?? []) as Connection[]
+
+  const normalize = (profile: Profile | Profile[]) =>
     Array.isArray(profile) ? profile[0] : profile
 
-  const pendingRequests =
-    connections?.filter((c: any) => {
-      const receiver = normalize(c.receiver)
-      return c.status === 'pending' && receiver?.id === user.id
-    }) || []
+  const pendingRequests = connections.filter((c) => {
+    const receiver = normalize(c.receiver)
+    return c.status === 'pending' && receiver?.id === user.id
+  })
 
-  const acceptedConnections =
-    connections?.filter((c: any) => c.status === 'accepted') || []
+  const acceptedConnections = connections.filter(
+    (c) => c.status === 'accepted'
+  )
 
   const updateConnectionStatus = async (
     id: string,
@@ -67,29 +83,26 @@ export default async function ConnectionsPage() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Your Network
-        </h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-400">
+        <h1 className="text-3xl font-bold">Your Network</h1>
+        <p className="mt-2 text-slate-600">
           Manage your connections and incoming requests.
         </p>
       </div>
 
-      {/* Pending Requests */}
       {pendingRequests.length > 0 && (
         <section>
-          <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-white">
+          <h2 className="mb-4 text-xl font-semibold">
             Connection Requests
           </h2>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pendingRequests.map((req: any) => {
+            {pendingRequests.map((req) => {
               const sender = normalize(req.sender)
 
               return (
                 <div
                   key={req.id}
-                  className="flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900/50 dark:bg-brand-950/20"
+                  className="flex items-center justify-between rounded-xl border p-4"
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200">
@@ -107,7 +120,7 @@ export default async function ConnectionsPage() {
                     </div>
 
                     <div>
-                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                      <h3 className="font-semibold">
                         {sender?.full_name}
                       </h3>
                       <p className="text-xs text-slate-500">
@@ -124,7 +137,7 @@ export default async function ConnectionsPage() {
                         'accepted'
                       )}
                     >
-                      <Button size="icon" className="h-8 w-8 rounded-full bg-brand-500 hover:bg-brand-600">
+                      <Button size="icon">
                         <UserCheck className="h-4 w-4" />
                       </Button>
                     </form>
@@ -136,7 +149,7 @@ export default async function ConnectionsPage() {
                         'rejected'
                       )}
                     >
-                      <Button size="icon" variant="outline" className="h-8 w-8 rounded-full text-slate-500 hover:text-red-500">
+                      <Button size="icon" variant="outline">
                         <UserX className="h-4 w-4" />
                       </Button>
                     </form>
@@ -148,66 +161,58 @@ export default async function ConnectionsPage() {
         </section>
       )}
 
-      {/* Accepted Connections */}
       <section>
-        <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-white">
+        <h2 className="mb-4 text-xl font-semibold">
           My Circle ({acceptedConnections.length})
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {acceptedConnections.length > 0 ? (
-            acceptedConnections.map((conn: any) => {
-              const sender = normalize(conn.sender)
-              const receiver = normalize(conn.receiver)
+          {acceptedConnections.map((conn) => {
+            const sender = normalize(conn.sender)
+            const receiver = normalize(conn.receiver)
 
-              const friend =
-                sender?.id === user.id ? receiver : sender
+            const friend =
+              sender?.id === user.id ? receiver : sender
 
-              return (
-                <div
-                  key={conn.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 gap-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-200">
-                      {friend?.avatar_url ? (
-                        <img
-                          src={friend.avatar_url}
-                          alt={friend.full_name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-lg font-bold">
-                          {friend?.full_name?.charAt(0) || '?'}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <h3 className="font-semibold text-slate-900 dark:text-white">
-                        {friend?.full_name}
-                      </h3>
-                      <p className="text-sm text-slate-500">
-                        {friend?.branch} • Year {friend?.year}
-                      </p>
-                    </div>
+            return (
+              <div
+                key={conn.id}
+                className="flex items-center justify-between rounded-2xl border p-5"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-200">
+                    {friend?.avatar_url ? (
+                      <img
+                        src={friend.avatar_url}
+                        alt={friend.full_name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-bold">
+                        {friend?.full_name?.charAt(0) || '?'}
+                      </div>
+                    )}
                   </div>
 
-                  <Link href={`/chat/${conn.id}`} className="w-full sm:w-auto">
-                    <Button variant="outline" className="w-full gap-2">
-                      <MessageSquare className="h-4 w-4" /> Message
-                    </Button>
-                  </Link>
+                  <div>
+                    <h3 className="font-semibold">
+                      {friend?.full_name}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {friend?.branch} • Year {friend?.year}
+                    </p>
+                  </div>
                 </div>
-              )
-            })
-          ) : (
-            <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-800">
-              <p className="text-slate-500 dark:text-slate-400">
-                You haven&apos;t added anyone to your circle yet.
-              </p>
-            </div>
-          )}
+
+                <Link href={`/chat/${conn.id}`}>
+                  <Button variant="outline">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Message
+                  </Button>
+                </Link>
+              </div>
+            )
+          })}
         </div>
       </section>
     </div>
