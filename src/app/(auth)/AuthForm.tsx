@@ -23,7 +23,7 @@ export function AuthForm() {
             if (response?.error) {
                 setError(response.error)
             }
-        } catch (e) {
+        } catch {
             setError('An unexpected error occurred')
         } finally {
             setIsLoading(false)
