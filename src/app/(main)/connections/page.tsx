@@ -210,7 +210,8 @@ export default async function ConnectionsPage() {
           ) : (
             <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-800">
               <p className="text-slate-500 dark:text-slate-400">
-                You haven't added anyone to your circle yet.
+                You haven&apos;t added anyone to your circle yet.
+                
               </p>
             </div>
           )}
