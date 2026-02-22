@@ -90,8 +90,8 @@ export function ChatRoom({
     }
   }, [connectionId, supabase])
 
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const sendMessage = async (_e: React.FormEvent) => {
+    _e.preventDefault()
     if (!newMessage.trim() || isSending) return
 
     setIsSending(true)
